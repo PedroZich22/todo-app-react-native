@@ -1,27 +1,58 @@
 import React, { useEffect, useState } from "react";
-import { Button, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Button,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { FlatList, GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { getAllTodos, getDBVersion, getSQLiteVersion, migrateDB } from "@/lib/db";
+import {
+  createTodo,
+  getAllTodos,
+  getDBVersion,
+  getSQLiteVersion,
+  migrateDB,
+  toogleDone as toggleDone,
+} from "@/lib/db";
 import { TodoItem, uuid } from "@/lib/types";
 import * as crypto from "expo-crypto";
-import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
+import { SQLiteDatabase, SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-
-function ListItem({ todoItem, toggleTodo }: { todoItem: TodoItem; toggleTodo: (id: uuid) => void }) {
-
+function ListItem({
+  todoItem,
+  toggleTodo,
+}: {
+  todoItem: TodoItem;
+  toggleTodo: (id: uuid) => void;
+}) {
   const handlePress = (id: uuid) => {
     console.log(`Todo item with id ${id} marked as complete.`);
     toggleTodo(id);
   };
 
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
       {!todoItem.done ? (
         <>
           <Text style={styles.item}>{todoItem.text}</Text>
-          <Button title="Concluir" onPress={() => { handlePress(todoItem.id) }} color="green" />
+          <Button
+            title="Concluir"
+            onPress={() => {
+              handlePress(todoItem.id);
+            }}
+            color="green"
+          />
         </>
       ) : (
         <Text style={styles.itemdone}>{todoItem.text}</Text>
@@ -33,35 +64,86 @@ function ListItem({ todoItem, toggleTodo }: { todoItem: TodoItem; toggleTodo: (i
 enum FilterOptions {
   All = "all",
   Pending = "pending",
-  Done = "done"
+  Done = "done",
 }
 
-function TodosFilter({ selectedValue, setFilter }: { selectedValue: FilterOptions, setFilter: (value: FilterOptions) => void }) {
+function TodosFilter({
+  selectedValue,
+  setFilter,
+}: {
+  selectedValue: FilterOptions;
+  setFilter: (value: FilterOptions) => void;
+}) {
   return (
     <View style={filterStyles.filterMenu}>
       <TouchableOpacity
-        style={[filterStyles.button, filterStyles.buttonAll, selectedValue === FilterOptions.All && filterStyles.buttonAllSelected]}
+        style={[
+          filterStyles.button,
+          filterStyles.buttonAll,
+          selectedValue === FilterOptions.All && filterStyles.buttonAllSelected,
+        ]}
         onPress={() => setFilter(FilterOptions.All)}
       >
-        <Text style={[filterStyles.label, filterStyles.buttonAllLabel, selectedValue === FilterOptions.All && filterStyles.buttonAllSelectedLabel]}>Todos</Text>
+        <Text
+          style={[
+            filterStyles.label,
+            filterStyles.buttonAllLabel,
+            selectedValue === FilterOptions.All &&
+              filterStyles.buttonAllSelectedLabel,
+          ]}
+        >
+          Todos
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[filterStyles.button, filterStyles.buttonPending, selectedValue === FilterOptions.Pending && filterStyles.buttonPendingSelected]}
+        style={[
+          filterStyles.button,
+          filterStyles.buttonPending,
+          selectedValue === FilterOptions.Pending &&
+            filterStyles.buttonPendingSelected,
+        ]}
         onPress={() => setFilter(FilterOptions.Pending)}
       >
-        <Text style={[filterStyles.label, filterStyles.buttonPendingLabel, selectedValue === FilterOptions.Pending && filterStyles.buttonPendingSelectedLabel]}>Pendentes</Text>
+        <Text
+          style={[
+            filterStyles.label,
+            filterStyles.buttonPendingLabel,
+            selectedValue === FilterOptions.Pending &&
+              filterStyles.buttonPendingSelectedLabel,
+          ]}
+        >
+          Pendentes
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[filterStyles.button, filterStyles.buttonDone, selectedValue === FilterOptions.Done && filterStyles.buttonDoneSelected]}
+        style={[
+          filterStyles.button,
+          filterStyles.buttonDone,
+          selectedValue === FilterOptions.Done &&
+            filterStyles.buttonDoneSelected,
+        ]}
         onPress={() => setFilter(FilterOptions.Done)}
       >
-        <Text style={[filterStyles.label, filterStyles.buttonDoneLabel, selectedValue === FilterOptions.Done && filterStyles.buttonDoneSelectedLabel]}>Concluídos</Text>
+        <Text
+          style={[
+            filterStyles.label,
+            filterStyles.buttonDoneLabel,
+            selectedValue === FilterOptions.Done &&
+              filterStyles.buttonDoneSelectedLabel,
+          ]}
+        >
+          Concluídos
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-function AddTodoForm({ addTodoHandler }: { addTodoHandler: (text: string) => void }) {
+function AddTodoForm({
+  addTodoHandler,
+}: {
+  addTodoHandler: (text: string) => void;
+}) {
   const [text, setText] = React.useState("");
 
   const handlePress = () => {
@@ -73,7 +155,14 @@ function AddTodoForm({ addTodoHandler }: { addTodoHandler: (text: string) => voi
   };
 
   return (
-    <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 20, alignItems: "center" }}>
+    <View
+      style={{
+        width: "100%",
+        marginTop: 10,
+        paddingHorizontal: 20,
+        alignItems: "center",
+      }}
+    >
       <TextInput
         value={text}
         onChangeText={setText}
@@ -93,27 +182,22 @@ function Footer() {
   const [sqliteVersion, setSqliteVersion] = useState<string>("");
   const [dbVersion, setDBVersion] = useState<string>();
 
-  useEffect( () => {
-    async function setup(){
+  useEffect(() => {
+    async function setup() {
       const sqliteVersionResult = await getSQLiteVersion(db);
       if (sqliteVersionResult) {
-        setSqliteVersion(sqliteVersionResult['sqlite_version()']);
-      }
-      else {
-        setSqliteVersion('unknown');
+        setSqliteVersion(sqliteVersionResult["sqlite_version()"]);
+      } else {
+        setSqliteVersion("unknown");
       }
 
       const dbVersionResult = await getDBVersion(db);
-      
+
       if (dbVersionResult) {
-        setDBVersion(dbVersionResult['user_version'].toString());
+        setDBVersion(dbVersionResult["user_version"].toString());
+      } else {
+        setDBVersion("unknown");
       }
-      else {
-        setDBVersion('unknown');
-      }
-
-
-
     }
 
     setup();
@@ -121,36 +205,40 @@ function Footer() {
 
   return (
     <View>
-      <Text style={{padding: 20}}>SQLite version: {sqliteVersion} / DBVersion: {dbVersion}</Text>
+      <Text style={{ padding: 20 }}>
+        SQLite version: {sqliteVersion} / DBVersion: {dbVersion}
+      </Text>
     </View>
   );
 }
 
 function TodoList() {
-  
   const [todos, setTodos] = React.useState<TodoItem[]>([]);
 
   const db = useSQLiteContext();
-  
+
+  async function load(db: SQLiteDatabase) {
+    const result = await getAllTodos(db);
+    setTodos(result);
+  }
+
   useEffect(() => {
-    async function load() {
-      const result = await getAllTodos(db);
-      setTodos(result);
-    }
-    
-    load();
-
-  }, [db])
-
+    load(db);
+  }, [db]);
 
   const [filter, setFilter] = React.useState<FilterOptions>(FilterOptions.All);
 
   const addTodo = (text: string) => {
-    setTodos([...todos, { id: crypto.randomUUID(), text: text, done: false, createdAt: new Date() }]);
+    createTodo(db, {
+      id: crypto.randomUUID(),
+      text: text,
+      done: false,
+      createdAt: new Date(),
+    }).then(load);
   };
 
   const toggleTodo = (id: uuid) => {
-    setTodos(todos.map(todo => todo.id === id ? { ...todo, done: !todo.done } : todo));
+    toggleDone(db, id).then(load);
   };
 
   return (
@@ -162,22 +250,24 @@ function TodoList() {
       <TodosFilter selectedValue={filter} setFilter={setFilter} />
       <FlatList
         style={styles.list}
-        data={todos.filter(todo => {
-          switch (filter) {
-            case FilterOptions.All:
-              return true;
-            case FilterOptions.Pending:
-              return !todo.done;
-            case FilterOptions.Done:
-              return todo.done;
-            default:
-              return true;
-          }
-        }).sort((a, b) => {
-          const aDate = a.createdAt ?? new Date(0);
-          const bDate = b.createdAt ?? new Date(0);
-          return aDate === bDate ? 0 : aDate < bDate ? 1 : -1;
-        })}
+        data={todos
+          .filter((todo) => {
+            switch (filter) {
+              case FilterOptions.All:
+                return true;
+              case FilterOptions.Pending:
+                return !todo.done;
+              case FilterOptions.Done:
+                return todo.done;
+              default:
+                return true;
+            }
+          })
+          .sort((a, b) => {
+            const aDate = a.createdAt ?? new Date(0);
+            const bDate = b.createdAt ?? new Date(0);
+            return aDate === bDate ? 0 : aDate < bDate ? 1 : -1;
+          })}
         renderItem={({ item }) => (
           <ListItem todoItem={item} toggleTodo={toggleTodo} />
         )}
@@ -185,7 +275,6 @@ function TodoList() {
     </GestureHandlerRootView>
   );
 }
-
 
 export default function Index() {
   return (
@@ -241,70 +330,69 @@ const filterStyles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 20,
-    marginTop: 10
+    marginTop: 10,
   },
 
   button: {
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 50,
-    alignSelf: 'flex-start',
-    marginHorizontal: '1%',
+    alignSelf: "flex-start",
+    marginHorizontal: "1%",
     marginBottom: 6,
-    minWidth: '28%',
-    textAlign: 'center',
+    minWidth: "28%",
+    textAlign: "center",
   },
 
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontWeight: "500",
+    textAlign: "center",
   },
 
   buttonAll: {
-    backgroundColor: 'lightgreen',
+    backgroundColor: "lightgreen",
   },
   buttonAllSelected: {
-    backgroundColor: 'darkgreen',
+    backgroundColor: "darkgreen",
   },
 
   buttonAllLabel: {
-    color: 'darkgreen',
+    color: "darkgreen",
   },
 
   buttonAllSelectedLabel: {
-    color: 'lightgreen',
+    color: "lightgreen",
   },
 
   buttonPending: {
-    backgroundColor: 'oldlace',
+    backgroundColor: "oldlace",
   },
   buttonPendingSelected: {
-    backgroundColor: 'coral',
+    backgroundColor: "coral",
   },
 
   buttonPendingLabel: {
-    color: 'coral',
+    color: "coral",
   },
   buttonPendingSelectedLabel: {
-    color: 'oldlace',
+    color: "oldlace",
   },
 
   buttonDone: {
-    backgroundColor: 'lightblue',
+    backgroundColor: "lightblue",
   },
   buttonDoneSelected: {
-    backgroundColor: 'royalblue',
+    backgroundColor: "royalblue",
   },
   buttonDoneLabel: {
-    color: 'royalblue',
+    color: "royalblue",
   },
   buttonDoneSelectedLabel: {
-    color: 'lightblue',
+    color: "lightblue",
   },
 
   selectedLabel: {
-    color: 'white',
+    color: "white",
   },
 });
-
